@@ -129,6 +129,9 @@ windows/vcpkg/buildtrees/
 windows/vcpkg/downloads/
 windows/vcpkg/installed/
 windows/vcpkg/packages/
+windows/vcpkg
+windows/vcpkg/
+
 
 # Node modules (if any)
 node_modules/

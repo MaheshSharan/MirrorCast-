@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::qr::QRCodeManager;
 use crate::webrtc::WebRTCManager;
-use crate::renderer::VideoRenderer;
+use crate::renderer::{VideoRenderer, VideoFrame, VideoFormat};
 use crate::ui::{ConnectionState, AppTheme};
 
 /// Main application state for MirrorCast Windows.
@@ -26,6 +26,9 @@ pub struct MirrorCastApp {
     
     // Runtime data
     connected_device_info: Option<ConnectedDevice>,
+    
+    // Frame processing
+    frame_receiver: Option<std::sync::mpsc::Receiver<VideoFrame>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,12 +55,10 @@ pub struct ConnectedDevice {
     pub resolution: (u32, u32),
 }
 
-impl MirrorCastApp {
-    /// Create a new MirrorCast application instance.
+impl MirrorCastApp {    /// Create a new MirrorCast application instance.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         log::info!("Initializing MirrorCast application");
-        
-        Self {
+          let mut app = Self {
             qr_manager: QRCodeManager::new(),
             webrtc_manager: Arc::new(Mutex::new(WebRTCManager::new())),
             video_renderer: VideoRenderer::new(),
@@ -67,7 +68,13 @@ impl MirrorCastApp {
             quality_setting: VideoQuality::High,
             auto_accept_connections: true,
             connected_device_info: None,
-        }
+            frame_receiver: None,
+        };
+        
+        // Set up WebRTC frame callback to feed frames to video renderer
+        app.setup_webrtc_frame_callback();
+        
+        app
     }
 
     /// Generate a new QR code for connection.
@@ -116,6 +123,43 @@ impl MirrorCastApp {
         if let Ok(mut manager) = self.webrtc_manager.lock() {
             manager.disconnect();
         }
+    }
+
+    /// Set up WebRTC frame callback to connect WebRTC track handler to video renderer
+    fn setup_webrtc_frame_callback(&mut self) {
+        let webrtc_manager = Arc::clone(&self.webrtc_manager);
+        
+        // Create a channel for frame communication between WebRTC and renderer
+        let (frame_sender, frame_receiver) = std::sync::mpsc::channel::<VideoFrame>();
+        
+        // Set up the frame callback for WebRTC manager
+        if let Ok(mut manager) = webrtc_manager.lock() {
+            manager.set_frame_callback(move |h264_data: &[u8]| {
+                log::debug!("Received H.264 frame from WebRTC: {} bytes", h264_data.len());
+                
+                // Create VideoFrame with H.264 data
+                let frame = VideoFrame {
+                    data: h264_data.to_vec(),
+                    width: 1080,  // Default resolution, will be updated when actual resolution is known
+                    height: 1920, // Default resolution, will be updated when actual resolution is known
+                    format: VideoFormat::H264,
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                };
+                
+                // Send frame to renderer
+                if let Err(e) = frame_sender.send(frame) {
+                    log::warn!("Failed to send frame to renderer: {}", e);
+                }
+            });
+        }
+        
+        // Store the receiver for processing in update loop
+        self.frame_receiver = Some(frame_receiver);
+        
+        log::info!("WebRTC frame callback setup completed");
     }
 }
 
@@ -252,9 +296,10 @@ impl MirrorCastApp {
             let video_rect = egui::Rect::from_min_size(
                 available_rect.min,
                 egui::vec2(available_rect.width(), available_rect.height() - 60.0)
-            );
-
-            // Render video frame or placeholder
+            );            // Render video frame or placeholder
+            // First, create texture from pending frame data if available
+            self.video_renderer.create_texture_if_needed(ui.ctx());
+            
             if let Some(video_frame) = self.video_renderer.get_current_frame() {
                 ui.allocate_ui_at_rect(video_rect, |ui| {
                     ui.add(egui::Image::new(video_frame).fit_to_exact_size(video_rect.size()));
@@ -377,14 +422,22 @@ impl MirrorCastApp {
                 });
             });
         });
-    }
-
-    /// Update connection state and handle background tasks.
+    }    /// Update connection state and handle background tasks.
     fn update_connection_state(&mut self) {
         // Check for incoming connections
         if let Ok(manager) = self.webrtc_manager.try_lock() {
             if let Some(device_info) = manager.get_pending_connection() {
                 self.handle_connection(device_info);
+            }
+        }
+        
+        // Process incoming video frames
+        if let Some(ref frame_receiver) = self.frame_receiver {
+            // Process all available frames (non-blocking)
+            while let Ok(frame) = frame_receiver.try_recv() {
+                if let Err(e) = self.video_renderer.receive_frame(frame) {
+                    log::warn!("Failed to process video frame: {}", e);
+                }
             }
         }
         

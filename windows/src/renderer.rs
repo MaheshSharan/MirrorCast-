@@ -1,6 +1,126 @@
 use eframe::egui;
 use std::sync::{Arc, Mutex};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use ffmpeg_next as ffmpeg;
+
+// H.264 decoder for processing encoded video frames
+struct H264Decoder {
+    decoder: ffmpeg::decoder::Video,
+    scaler: Option<ffmpeg::software::scaling::Context>,
+}
+
+impl H264Decoder {
+    fn new() -> Result<Self> {
+        // Initialize FFmpeg if not already done
+        ffmpeg::init().map_err(|e| anyhow!("Failed to initialize FFmpeg: {}", e))?;
+        
+        // Find H.264 decoder
+        let decoder = ffmpeg::decoder::find(ffmpeg::codec::Id::H264)
+            .ok_or_else(|| anyhow!("H.264 decoder not found"))?
+            .video()
+            .map_err(|e| anyhow!("Failed to create H.264 video decoder: {}", e))?;
+        
+        Ok(Self {
+            decoder,
+            scaler: None,
+        })
+    }
+    
+    fn decode_frame(&mut self, h264_data: &[u8]) -> Result<Vec<u8>> {
+        // Create a packet from H.264 data
+        let mut packet = ffmpeg::Packet::new(h264_data.len());
+        packet.data_mut().unwrap().copy_from_slice(h264_data);
+        
+        // Send packet to decoder
+        self.decoder.send_packet(&packet)
+            .map_err(|e| anyhow!("Failed to send packet to decoder: {}", e))?;
+        
+        // Receive decoded frame
+        let mut decoded_frame = ffmpeg::util::frame::Video::empty();
+        match self.decoder.receive_frame(&mut decoded_frame) {
+            Ok(_) => {
+                log::debug!("Successfully decoded frame: {}x{}", 
+                           decoded_frame.width(), decoded_frame.height());
+                
+                // Convert YUV to RGB
+                self.convert_to_rgb(&decoded_frame)
+            },
+            Err(ffmpeg::Error::Other { errno: ffmpeg::util::error::EAGAIN }) => {
+                // Need more data
+                Err(anyhow!("Decoder needs more data"))
+            },
+            Err(e) => Err(anyhow!("Failed to decode frame: {}", e))
+        }
+    }
+        let mut decoded_frame = ffmpeg::util::frame::Video::empty();
+        match self.decoder_context.receive_frame(&mut decoded_frame) {
+            Ok(_) => {
+                log::debug!("Successfully decoded frame: {}x{}", 
+                           decoded_frame.width(), decoded_frame.height());
+                
+                // Convert YUV to RGB
+                self.convert_to_rgb(&decoded_frame)
+            },
+            Err(ffmpeg::Error::Other { errno: ffmpeg::util::error::EAGAIN }) => {
+                // Need more data
+                Err(anyhow!("Decoder needs more data"))
+            },
+            Err(e) => Err(anyhow!("Failed to decode frame: {}", e))
+        }
+    }
+    
+    fn convert_to_rgb(&mut self, frame: &ffmpeg::util::frame::Video) -> Result<Vec<u8>> {
+        let width = frame.width();
+        let height = frame.height();
+        
+        // Initialize scaler if needed or if format changed
+        if self.scaler.is_none() {
+            self.scaler = Some(
+                ffmpeg::software::scaling::Context::get(
+                    frame.format(),
+                    width,
+                    height,
+                    ffmpeg::format::Pixel::RGB24,
+                    width,
+                    height,
+                    ffmpeg::software::scaling::Flags::BILINEAR,
+                ).map_err(|e| anyhow!("Failed to create scaler: {}", e))?
+            );
+        }
+        
+        // Create output frame for RGB data
+        let mut rgb_frame = ffmpeg::util::frame::Video::empty();
+        rgb_frame.set_format(ffmpeg::format::Pixel::RGB24);
+        rgb_frame.set_width(width);
+        rgb_frame.set_height(height);
+        
+        // Allocate buffer for the RGB frame
+        rgb_frame.alloc()
+            .map_err(|e| anyhow!("Failed to allocate RGB frame: {}", e))?;
+        
+        // Scale/convert to RGB
+        if let Some(ref mut scaler) = self.scaler {
+            scaler.run(frame, &mut rgb_frame)
+                .map_err(|e| anyhow!("Failed to scale frame: {}", e))?;
+        }
+        
+        // Extract RGB data
+        let rgb_data = rgb_frame.data(0);
+        let line_size = rgb_frame.stride(0);
+        let mut output = Vec::with_capacity((width * height * 3) as usize);
+        
+        // Copy RGB data line by line (in case of padding)
+        for y in 0..height {
+            let start = (y * line_size as u32) as usize;
+            let end = start + (width * 3) as usize;
+            if end <= rgb_data.len() {
+                output.extend_from_slice(&rgb_data[start..end]);
+            }
+        }
+        
+        Ok(output)
+    }
+}
 
 /// Handles video rendering and display of streamed content from Android devices.
 /// Manages video frames, scaling, and display optimization.
@@ -23,6 +143,12 @@ pub struct VideoRenderer {
     scaling_mode: ScalingMode,
     aspect_ratio_mode: AspectRatioMode,
     enable_vsync: bool,
+    
+    // H.264 decoder
+    h264_decoder: Option<H264Decoder>,
+    
+    // Pending frame for texture creation
+    pending_frame: Option<egui::ColorImage>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,8 +183,7 @@ pub enum VideoFormat {
     H264,
 }
 
-impl VideoRenderer {
-    /// Create a new video renderer.
+impl VideoRenderer {    /// Create a new video renderer.
     pub fn new() -> Self {
         Self {
             current_frame: None,
@@ -72,6 +197,8 @@ impl VideoRenderer {
             scaling_mode: ScalingMode::Fit,
             aspect_ratio_mode: AspectRatioMode::Maintain,
             enable_vsync: true,
+            h264_decoder: None,
+            pending_frame: None,
         }
     }
 
@@ -223,19 +350,78 @@ impl VideoRenderer {
             format: VideoFormat::RGB24,
             timestamp: frame.timestamp,
         })
-    }
-
-    /// Process H264 encoded frame.
+    }    /// Process H264 encoded frame.
     fn process_h264_frame(&mut self, frame: &VideoFrame) -> Result<()> {
-        // In a real implementation, this would decode H264 using FFmpeg or similar
-        log::warn!("H264 decoding not implemented in this demo");
+        log::debug!("Processing H.264 frame: {} bytes", frame.data.len());
         
-        // For demo purposes, create a placeholder frame
-        let placeholder_data = vec![128u8; (frame.width * frame.height * 4) as usize];
-        self.create_texture_from_rgba(placeholder_data, frame.width, frame.height)
+        // Initialize decoder if needed
+        if self.h264_decoder.is_none() {
+            match H264Decoder::new() {
+                Ok(decoder) => {
+                    self.h264_decoder = Some(decoder);
+                    log::info!("H.264 decoder initialized successfully");
+                },
+                Err(e) => {
+                    log::error!("Failed to initialize H.264 decoder: {}", e);
+                    // Fallback to placeholder
+                    return self.create_placeholder_frame(frame);
+                }
+            }
+        }
+        
+        // Decode H.264 frame
+        if let Some(ref mut decoder) = self.h264_decoder {
+            match decoder.decode_frame(&frame.data) {
+                Ok(rgb_data) => {
+                    log::debug!("Successfully decoded H.264 frame to RGB");
+                    
+                    // Convert RGB24 to RGBA32 for egui
+                    let mut rgba_data = Vec::with_capacity(rgb_data.len() * 4 / 3);
+                    for chunk in rgb_data.chunks(3) {
+                        if chunk.len() == 3 {
+                            rgba_data.push(chunk[0]); // R
+                            rgba_data.push(chunk[1]); // G
+                            rgba_data.push(chunk[2]); // B
+                            rgba_data.push(255);      // A
+                        }
+                    }
+                    
+                    self.create_texture_from_rgba(rgba_data, frame.width, frame.height)
+                },
+                Err(e) => {
+                    log::warn!("Failed to decode H.264 frame: {}, using placeholder", e);
+                    self.create_placeholder_frame(frame)
+                }
+            }
+        } else {
+            log::warn!("H.264 decoder not available, using placeholder");
+            self.create_placeholder_frame(frame)
+        }
     }
-
-    /// Create an egui texture from RGBA data.
+    
+    /// Create a placeholder frame when H.264 decoding fails.
+    fn create_placeholder_frame(&mut self, frame: &VideoFrame) -> Result<()> {
+        // Create a test pattern placeholder
+        let mut placeholder_data = Vec::with_capacity((frame.width * frame.height * 4) as usize);
+        
+        for y in 0..frame.height {
+            for x in 0..frame.width {
+                // Create a gradient pattern
+                let r = ((x as f32 / frame.width as f32) * 255.0) as u8;
+                let g = ((y as f32 / frame.height as f32) * 255.0) as u8;
+                let b = 128u8; // Constant blue component
+                let a = 255u8; // Full alpha
+                
+                placeholder_data.push(r);
+                placeholder_data.push(g);
+                placeholder_data.push(b);
+                placeholder_data.push(a);
+            }
+        }
+        
+        log::debug!("Created placeholder frame: {}x{}", frame.width, frame.height);
+        self.create_texture_from_rgba(placeholder_data, frame.width, frame.height)
+    }    /// Create an egui texture from RGBA data.
     fn create_texture_from_rgba(&mut self, data: Vec<u8>, width: u32, height: u32) -> Result<()> {
         let pixels: Vec<egui::Color32> = data
             .chunks(4)
@@ -253,9 +439,10 @@ impl VideoRenderer {
             pixels,
         };
 
-        // Note: In real implementation, this would need access to egui context
-        // For now, we'll store the image data and create texture when context is available
-        log::debug!("Created texture: {}x{}", width, height);
+        // Store the image for texture creation when egui context is available
+        self.pending_frame = Some(color_image);
+        
+        log::debug!("Prepared texture data: {}x{}", width, height);
         
         Ok(())
     }
@@ -336,6 +523,19 @@ impl VideoRenderer {
         let elapsed = self.last_frame_time.elapsed().as_secs_f32();
         if elapsed > 0.0 {
             self.frame_rate = 1.0 / elapsed;
+        }
+    }
+
+    /// Create texture from pending frame data (call from UI context)
+    pub fn create_texture_if_needed(&mut self, ctx: &egui::Context) {
+        if let Some(color_image) = self.pending_frame.take() {
+            let texture = ctx.load_texture(
+                "video_frame",
+                color_image,
+                egui::TextureOptions::LINEAR
+            );
+            self.current_frame = Some(texture);
+            log::debug!("Created egui texture from pending frame");
         }
     }
 }
