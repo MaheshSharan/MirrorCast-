@@ -87,11 +87,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   MobileScanner(
                     controller: _controller,
                     onDetect: (capture) {
-                      final List<Barcode> barcodes = capture.barcodes;
-                      for (final barcode in barcodes) {
+                      final List<Barcode> barcodes = capture.barcodes;                      for (final barcode in barcodes) {
                         if (barcode.rawValue != null) {
-                          // TODO: Handle the scanned QR code value
-                          debugPrint('Barcode found! ${barcode.rawValue}');
+                          // Return the scanned QR code value to the calling screen
+                          debugPrint('QR Code scanned: ${barcode.rawValue}');
                           Navigator.pop(context, barcode.rawValue);
                         }
                       }

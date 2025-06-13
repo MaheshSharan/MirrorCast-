@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:android_app/config/app_config.dart';
 
 class ScreenCaptureService {
   static const MethodChannel _channel = MethodChannel('com.mirrorcast/screen_capture');
@@ -14,13 +15,12 @@ class ScreenCaptureService {
   Future<MediaStream> startScreenCapture() async {
     if (_mediaStream != null) return _mediaStream!;
 
-    try {
-      final constraints = {
+    try {      final constraints = {
         'audio': false,
         'video': {
           'mandatory': {
-            'minWidth': '1280',
-            'minHeight': '720',
+            'minWidth': '${AppConfig.defaultWidth}',
+            'minHeight': '${AppConfig.defaultHeight}',
             'minFrameRate': '30',
           },
           'facingMode': 'environment',

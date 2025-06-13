@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:android_app/models/connection_data.dart';
 import 'package:android_app/ui/widgets/app_header.dart';
@@ -48,9 +49,8 @@ class QRDisplayScreen extends StatelessWidget {
                             offset: const Offset(0, 10),
                           ),
                         ],
-                      ),
-                      child: QrImageView(
-                        data: connectionData.toJson().toString(),
+                      ),                      child: QrImageView(
+                        data: jsonEncode(connectionData.toJson()),
                         version: QrVersions.auto,
                         size: 250,
                         backgroundColor: Colors.white,

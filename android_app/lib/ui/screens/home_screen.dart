@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:android_app/ui/widgets/primary_button.dart';
 import 'package:android_app/ui/widgets/app_header.dart';
 import 'package:android_app/ui/screens/qr_scanner_screen.dart';
-import 'package:android_app/ui/screens/screen_capture_screen.dart';
 import 'package:android_app/ui/screens/qr_display_screen.dart';
 import 'package:android_app/ui/screens/receiver_screen.dart';
 import 'package:android_app/models/connection_data.dart';
+import 'package:android_app/models/connection_state.dart';
 import 'package:android_app/services/connection_manager.dart';
 import 'package:android_app/services/webrtc_service.dart';
+import 'package:android_app/config/app_config.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _webRTCService = WebRTCService();
-  final _connectionManager = ConnectionManager(_webRTCService);
+  late final _connectionManager = ConnectionManager(_webRTCService);
   ConnectionState _connectionState = const ConnectionState(
     type: ConnectionStateType.disconnected,
   );
@@ -41,11 +43,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _connectionManager.dispose();
     super.dispose();
   }
-
   Future<void> _startScreenSharing() async {
     final roomId = const Uuid().v4();
     final clientId = const Uuid().v4();
-    final signalingUrl = 'ws://your-signaling-server:8080';
+    final signalingUrl = AppConfig.getSignalingUrl();
 
     final connectionData = ConnectionData(
       roomId: roomId,
@@ -53,20 +54,31 @@ class _HomeScreenState extends State<HomeScreen> {
       signalingUrl: signalingUrl,
     );
 
-    await _connectionManager.connect(signalingUrl);
-    await _connectionManager.sendOffer();
+    try {
+      await _connectionManager.connect(signalingUrl);
+      await _connectionManager.sendOffer();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QRDisplayScreen(
-          connectionData: connectionData,
-          connectionState: _connectionState,
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QRDisplayScreen(
+            connectionData: connectionData,
+            connectionState: _connectionState,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start screen sharing: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _scanQRCode() async {

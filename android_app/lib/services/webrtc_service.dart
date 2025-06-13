@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:android_app/models/connection_state.dart';
 import 'package:android_app/services/screen_capture_service.dart';
+import 'package:android_app/config/app_config.dart';
 
 class WebRTCService {
   RTCPeerConnection? _peerConnection;
@@ -14,14 +15,10 @@ class WebRTCService {
   Stream<RTCIceCandidate> get iceCandidates => _iceCandidatesController.stream;
   Function(RTCTrackEvent)? onTrack;
 
-  Future<void> initialize() async {
-    final configuration = {
+  Future<void> initialize() async {    final configuration = {
       'iceServers': [
         {
-          'urls': [
-            'stun:stun1.l.google.com:19302',
-            'stun:stun2.l.google.com:19302',
-          ]
+          'urls': AppConfig.stunServers,
         }
       ],
       'sdpSemantics': 'unified-plan',
@@ -64,30 +61,28 @@ class WebRTCService {
     _localStream = stream;
 
     // Configure video encoding
-    final videoTrack = stream.getVideoTracks().first;
+    final videoTrack = stream.getVideoTracks().first;    // Configure video constraints using AppConfig
     await videoTrack.applyConstraints({
       'mandatory': {
-        'minWidth': '1280',
-        'minHeight': '720',
+        'minWidth': '${AppConfig.defaultWidth}',
+        'minHeight': '${AppConfig.defaultHeight}',
         'minFrameRate': '30',
-        'maxFrameRate': '60',
+        'maxFrameRate': '${AppConfig.maxFramerate}',
       },
       'optional': [
         {'googLeakyBucket': true},
         {'googTemporalLayeredScreencast': true},
       ],
-    });
-
-    // Set video encoding parameters
+    });    // Set video encoding parameters using AppConfig
     final sender = _peerConnection?.getSenders().firstWhere(
           (sender) => sender.track?.kind == 'video',
         );
     if (sender != null) {
       final parameters = sender.parameters;
       if (parameters.encodings != null) {
-        parameters.encodings![0].maxBitrate = 5000000; // 5 Mbps
-        parameters.encodings![0].minBitrate = 1000000; // 1 Mbps
-        parameters.encodings![0].maxFramerate = 60;
+        parameters.encodings![0].maxBitrate = AppConfig.maxBitrate;
+        parameters.encodings![0].minBitrate = AppConfig.minBitrate;
+        parameters.encodings![0].maxFramerate = AppConfig.maxFramerate;
         parameters.encodings![0].scaleResolutionDownBy = 1.0;
         await sender.setParameters(parameters);
       }

@@ -42,16 +42,16 @@ dependencies:
 
   # State Management
   provider: ^6.1.1
-
   # QR Code
   qr_code_scanner: ^1.0.1
+  qr_flutter: ^4.1.0
 
   # WebRTC
   flutter_webrtc: ^0.9.47
-
   # Utils
   shared_preferences: ^2.2.2
   logger: ^2.0.2+1
+  uuid: ^4.2.1
 
   # Screen Recording
   screen_recorder: ^0.0.1
