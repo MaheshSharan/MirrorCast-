@@ -19,7 +19,7 @@
   "dependencies": {
     "qrcode": "^1.5.3",
     "webrtc-adapter": "^8.2.3",
-    "node-webrtc": "^0.0.1",
+    "wrtc": "^0.4.7",
     "winston": "^3.11.0",
     "electron-store": "^8.1.0"
   },

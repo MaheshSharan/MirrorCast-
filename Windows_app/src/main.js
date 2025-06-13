@@ -29,7 +29,7 @@ function createWindow() {
   // After splash screen animation, load the main app
   setTimeout(() => {
     mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  }, 2000); // Match this with the splash screen animation duration
+  }, 3000); // Increased to 3 seconds to ensure splash screen is visible
 
   // Open DevTools in development mode
   if (isDev) {

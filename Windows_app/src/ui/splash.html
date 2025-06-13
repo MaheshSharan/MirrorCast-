@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MirrorCast</title>
     <link rel="stylesheet" href="styles/theme.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-    </style>
 </head>
 <body>
     <div class="splash-screen">
@@ -24,11 +17,8 @@
     <script>
         // Add any initialization logic here
         window.addEventListener('DOMContentLoaded', () => {
-            // Simulate loading time (remove in production)
-            setTimeout(() => {
-                // Navigate to main app
-                window.location.href = 'index.html';
-            }, 2000);
+            // The transition to index.html is handled by main.js
+            // This ensures the splash screen stays visible for the full duration
         });
     </script>
 </body>

@@ -56,6 +56,15 @@ dependencies:
   # Screen Recording
   screen_recorder: ^0.0.1
 
+  # Mobile Scanner
+  mobile_scanner: ^3.5.6
+
+  # Permission Handler
+  permission_handler: ^11.2.0
+
+  # WebSocket
+  web_socket_channel: ^2.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

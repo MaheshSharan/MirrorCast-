@@ -1,6 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internet Permission -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Camera Permission -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Screen Capture Permission -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
-        android:label="android_app"
+        android:label="MirrorCast"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
