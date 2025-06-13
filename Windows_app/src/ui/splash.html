@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MirrorCast</title>
+    <link rel="stylesheet" href="styles/theme.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="splash-screen">
+        <img src="assets/images/logo.svg" alt="MirrorCast Logo" class="splash-logo">
+        <h1 class="splash-title">MirrorCast</h1>
+        <p class="splash-subtitle">Wireless Screen Mirroring</p>
+        <div class="loading-indicator"></div>
+    </div>
+
+    <script>
+        // Add any initialization logic here
+        window.addEventListener('DOMContentLoaded', () => {
+            // Simulate loading time (remove in production)
+            setTimeout(() => {
+                // Navigate to main app
+                window.location.href = 'index.html';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
