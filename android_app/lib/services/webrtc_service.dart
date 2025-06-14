@@ -1,165 +1,211 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:android_app/models/connection_state.dart';
-import 'package:android_app/services/screen_capture_service.dart';
-import 'package:android_app/config/app_config.dart';
 
-class WebRTCService {
+class WebRTCService {  WebSocketChannel? _websocket;
   RTCPeerConnection? _peerConnection;
-  MediaStream? _localStream;
-  final _screenCaptureService = ScreenCaptureService();
   final _connectionStateController = StreamController<ConnectionState>.broadcast();
-  final _iceCandidatesController = StreamController<RTCIceCandidate>.broadcast();
-
+  Function(RTCPeerConnectionState)? onConnectionStateChanged;
+  
+  // Connection info
+  String? _roomId;
+  String? _clientId;
+  
   Stream<ConnectionState> get connectionState => _connectionStateController.stream;
-  Stream<RTCIceCandidate> get iceCandidates => _iceCandidatesController.stream;
-  Function(RTCTrackEvent)? onTrack;
 
-  Future<void> initialize() async {    final configuration = {
-      'iceServers': [
-        {
-          'urls': AppConfig.stunServers,
-        }
-      ],
-      'sdpSemantics': 'unified-plan',
-      'bundlePolicy': 'max-bundle',
-      'rtcpMuxPolicy': 'require',
-    };
-
-    final constraints = {
-      'mandatory': {
-        'OfferToReceiveVideo': true,
-        'OfferToReceiveAudio': false,
-      },
-      'optional': [
-        {'DtlsSrtpKeyAgreement': true},
-        {'RtpDataChannels': true},
-      ],
-    };
-
-    _peerConnection = await createPeerConnection(configuration, constraints);
-
-    _peerConnection?.onIceCandidate = (candidate) {
-      _iceCandidatesController.add(candidate);
-    };
-
-    _peerConnection?.onConnectionState = (state) {
-      _connectionStateController.add(ConnectionState.fromRTCState(state));
-    };
-
-    _peerConnection?.onIceConnectionState = (state) {
-      _connectionStateController.add(ConnectionState.fromIceState(state));
-    };
-
-    _peerConnection?.onTrack = onTrack;
-  }
-
-  Future<void> startScreenCapture() async {
-    if (_localStream != null) return;
-
-    final stream = await _screenCaptureService.startScreenCapture();
-    _localStream = stream;
-
-    // Configure video encoding
-    final videoTrack = stream.getVideoTracks().first;    // Configure video constraints using AppConfig
-    await videoTrack.applyConstraints({
-      'mandatory': {
-        'minWidth': '${AppConfig.defaultWidth}',
-        'minHeight': '${AppConfig.defaultHeight}',
-        'minFrameRate': '30',
-        'maxFrameRate': '${AppConfig.maxFramerate}',
-      },
-      'optional': [
-        {'googLeakyBucket': true},
-        {'googTemporalLayeredScreencast': true},
-      ],
-    });    // Set video encoding parameters using AppConfig
-    final sender = _peerConnection?.getSenders().firstWhere(
-          (sender) => sender.track?.kind == 'video',
-        );
-    if (sender != null) {
-      final parameters = sender.parameters;
-      if (parameters.encodings != null) {
-        parameters.encodings![0].maxBitrate = AppConfig.maxBitrate;
-        parameters.encodings![0].minBitrate = AppConfig.minBitrate;
-        parameters.encodings![0].maxFramerate = AppConfig.maxFramerate;
-        parameters.encodings![0].scaleResolutionDownBy = 1.0;
-        await sender.setParameters(parameters);
-      }
-    }
-
-    _peerConnection?.addStream(stream);
-  }
-
-  Future<void> stopScreenCapture() async {
-    if (_localStream == null) return;
-
-    _localStream?.getTracks().forEach((track) => track.stop());
-    _peerConnection?.removeStream(_localStream!);
-    _localStream = null;
-    await _screenCaptureService.stopScreenCapture();
-  }
-
-  Future<RTCSessionDescription> createOffer() async {
-    final offer = await _peerConnection!.createOffer({
-      'offerToReceiveVideo': true,
-      'offerToReceiveAudio': false,
-    });
-
-    // Set codec preferences
-    final sdp = offer.sdp;
-    final modifiedSdp = _setCodecPreferences(sdp);
-    final modifiedOffer = RTCSessionDescription(modifiedSdp, 'offer');
-
-    await _peerConnection!.setLocalDescription(modifiedOffer);
-    return modifiedOffer;
-  }
-
-  Future<RTCSessionDescription> createAnswer() async {
-    final answer = await _peerConnection!.createAnswer({
-      'offerToReceiveVideo': true,
-      'offerToReceiveAudio': false,
-    });
-
-    // Set codec preferences
-    final sdp = answer.sdp;
-    final modifiedSdp = _setCodecPreferences(sdp);
-    final modifiedAnswer = RTCSessionDescription(modifiedSdp, 'answer');
-
-    await _peerConnection!.setLocalDescription(modifiedAnswer);
-    return modifiedAnswer;
-  }
-
-  String _setCodecPreferences(String sdp) {
-    // Prefer H.264 over VP8/VP9 for better hardware acceleration
-    final lines = sdp.split('\n');
-    final videoSection = lines.indexWhere((line) => line.startsWith('m=video'));
-    if (videoSection != -1) {
-      final codecLine = lines.indexWhere(
-        (line) => line.startsWith('a=rtpmap:') && line.contains('H264'),
-        videoSection,
+  Future<void> connect(String signalingUrl, {String? roomId, String? clientId}) async {
+    _roomId = roomId;
+    _clientId = clientId;
+    try {
+      print('🔗 Connecting to signaling server: $signalingUrl');
+      _websocket = WebSocketChannel.connect(Uri.parse(signalingUrl));
+      
+      _websocket!.stream.listen(
+        (message) {
+          print('📨 Received signaling message: $message');
+          _handleSignalingMessage(jsonDecode(message));
+        },
+        onError: (error) {
+          print('❌ WebSocket error: $error');
+          _connectionStateController.add(ConnectionState.failed);
+        },
+        onDone: () {
+          print('🔌 WebSocket connection closed');
+          _connectionStateController.add(ConnectionState.disconnected);
+        },
       );
-      if (codecLine != -1) {
-        final codecId = lines[codecLine].split(':')[1].split(' ')[0];
-        lines.insert(videoSection + 1, 'a=fmtp:$codecId profile-level-id=42e01f;level-asymmetry-allowed=1');
+        await _initializePeerConnection();      // Send join room message
+      if (_roomId != null && _clientId != null) {
+        _sendSignalingMessage({
+          'type': 'join-room',
+          'roomId': _roomId,
+          'clientId': _clientId,
+          'role': 'android',
+        });
       }
+      
+      print('✅ WebRTC service connected successfully to room $_roomId');
+    } catch (e) {
+      print('❌ Failed to connect to signaling server: $e');
+      _connectionStateController.add(ConnectionState.failed);
+      throw Exception('Failed to connect to signaling server: $e');
     }
-    return lines.join('\n');
   }
 
-  Future<void> setRemoteDescription(RTCSessionDescription description) async {
-    await _peerConnection!.setRemoteDescription(description);
+  Future<void> _initializePeerConnection() async {
+    final configuration = <String, dynamic>{
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+      ]
+    };
+
+    _peerConnection = await createPeerConnection(configuration);
+    
+    _peerConnection!.onConnectionState = (state) {
+      print('🔄 Connection state changed: $state');
+      onConnectionStateChanged?.call(state);    };
+
+    _peerConnection!.onIceCandidate = (candidate) {        _sendSignalingMessage({
+          'type': 'ice-candidate',
+          'candidate': candidate.toMap(),
+        });
+    };
   }
 
-  Future<void> addIceCandidate(RTCIceCandidate candidate) async {
+  void _handleSignalingMessage(Map<String, dynamic> message) {
+    switch (message['type']) {
+      case 'offer':
+        _handleOffer(message);
+        break;
+      case 'answer':
+        _handleAnswer(message);
+        break;
+      case 'candidate':
+        _handleCandidate(message);
+        break;
+    }
+  }
+
+  Future<void> _handleOffer(Map<String, dynamic> message) async {
+    final offer = RTCSessionDescription(
+      message['sdp'],
+      message['type'],
+    );
+    await _peerConnection!.setRemoteDescription(offer);
+    final answer = await _peerConnection!.createAnswer();
+    await _peerConnection!.setLocalDescription(answer);
+    _sendSignalingMessage({
+      'type': 'answer',
+      'sdp': answer.sdp,
+    });
+  }
+
+  Future<void> _handleAnswer(Map<String, dynamic> message) async {
+    final answer = RTCSessionDescription(
+      message['sdp'],
+      message['type'],
+    );
+    await _peerConnection!.setRemoteDescription(answer);
+  }
+
+  Future<void> _handleCandidate(Map<String, dynamic> message) async {
+    final candidate = RTCIceCandidate(
+      message['candidate']['candidate'],
+      message['candidate']['sdpMid'],
+      message['candidate']['sdpMLineIndex'],
+    );
     await _peerConnection!.addCandidate(candidate);
   }
+  void _sendSignalingMessage(Map<String, dynamic> message) {
+    if (_websocket != null) {      // Add room and client information to all messages
+      final enrichedMessage = {
+        ...message,
+        'roomId': _roomId,
+        'clientId': _clientId,
+        'role': 'android', // Use android role expected by server
+      };
+      print('📤 Sending: ${enrichedMessage['type']} to room $_roomId');
+      _websocket!.sink.add(jsonEncode(enrichedMessage));
+    }
+  }
 
+  // Add media stream to peer connection
+  Future<void> addMediaStream(MediaStream stream) async {
+    if (_peerConnection == null) {
+      throw Exception('Peer connection not initialized');
+    }
+    
+    try {
+      for (final track in stream.getTracks()) {
+        await _peerConnection!.addTrack(track, stream);
+        print('✅ Added track: ${track.kind}');
+      }
+    } catch (e) {
+      print('❌ Failed to add media stream: $e');
+      throw Exception('Failed to add media stream: $e');
+    }
+  }
+
+  // Create offer
+  Future<void> createOffer() async {
+    if (_peerConnection == null) {
+      throw Exception('Peer connection not initialized');
+    }
+    
+    try {
+      print('🔄 Creating offer...');
+      final offer = await _peerConnection!.createOffer();
+      await _peerConnection!.setLocalDescription(offer);
+      
+      // Send offer through signaling
+      _sendSignalingMessage({
+        'type': 'offer',
+        'offer': offer.toMap(),
+      });
+      
+      print('✅ Offer created and sent');
+    } catch (e) {
+      print('❌ Failed to create offer: $e');
+      throw Exception('Failed to create offer: $e');
+    }
+  }
+
+  // Create answer (receiver side - Windows)
+  Future<RTCSessionDescription> createAnswer() async {
+    if (_peerConnection == null) {
+      throw Exception('Peer connection not initialized');
+    }
+
+    try {
+      print('📥 Creating answer...');
+      final answer = await _peerConnection!.createAnswer();
+      await _peerConnection!.setLocalDescription(answer);
+      print('✅ Answer created and set as local description');
+      
+      // Send answer through signaling
+      _sendSignalingMessage({
+        'type': 'answer',
+        'sdp': answer.sdp,
+      });
+      
+      return answer;
+    } catch (e) {
+      print('❌ Failed to create answer: $e');
+      throw Exception('Failed to create answer: $e');
+    }
+  }
+
+  // Close peer connection
   Future<void> close() async {
-    await stopScreenCapture();
     await _peerConnection?.close();
     _peerConnection = null;
-    await _connectionStateController.close();
-    await _iceCandidatesController.close();
   }
-} 
+
+  void dispose() {
+    _websocket?.sink.close();
+    _peerConnection?.close();
+    _connectionStateController.close();
+  }
+}

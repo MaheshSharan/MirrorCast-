@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Internet Permission -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">    <!-- Internet Permission -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Camera Permission -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Screen Capture Permission -->
+    <uses-permission android:name="android.permission.CAMERA" />    <!-- Screen Capture Permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Media Projection for screen recording -->
+    <uses-permission android:name="android.permission.MEDIA_PROJECTION" />
+    <!-- Post notifications for foreground service -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="MirrorCast"
@@ -32,8 +37,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
+            </intent-filter>        </activity>
+        
+        <!-- Foreground service for screen capture -->
+        <service
+            android:name="com.mirrorcast.ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+            
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

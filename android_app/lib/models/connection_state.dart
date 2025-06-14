@@ -1,66 +1,43 @@
-enum ConnectionStateType {
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+enum ConnectionState {
   connecting,
   connected,
   disconnected,
-  failed,
-  closed,
+  failed;
+
+  static ConnectionState fromRTCState(RTCPeerConnectionState state) {
+    switch (state) {
+      case RTCPeerConnectionState.RTCPeerConnectionStateConnecting:
+        return ConnectionState.connecting;
+      case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
+        return ConnectionState.connected;
+      case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
+        return ConnectionState.disconnected;
+      case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+        return ConnectionState.failed;
+      case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
+        return ConnectionState.disconnected;
+      default:
+        return ConnectionState.failed;
+    }
+  }
+
+  static ConnectionState fromIceState(RTCIceConnectionState state) {
+    switch (state) {
+      case RTCIceConnectionState.RTCIceConnectionStateChecking:
+        return ConnectionState.connecting;
+      case RTCIceConnectionState.RTCIceConnectionStateConnected:
+      case RTCIceConnectionState.RTCIceConnectionStateCompleted:
+        return ConnectionState.connected;
+      case RTCIceConnectionState.RTCIceConnectionStateDisconnected:
+        return ConnectionState.disconnected;
+      case RTCIceConnectionState.RTCIceConnectionStateFailed:
+        return ConnectionState.failed;
+      case RTCIceConnectionState.RTCIceConnectionStateClosed:
+        return ConnectionState.disconnected;
+      default:
+        return ConnectionState.failed;
+    }
+  }
 }
-
-class ConnectionState {
-  final ConnectionStateType type;
-  final String? error;
-
-  const ConnectionState({
-    required this.type,
-    this.error,
-  });
-
-  factory ConnectionState.fromRTCState(String state) {
-    switch (state) {
-      case 'connecting':
-        return const ConnectionState(type: ConnectionStateType.connecting);
-      case 'connected':
-        return const ConnectionState(type: ConnectionStateType.connected);
-      case 'disconnected':
-        return const ConnectionState(type: ConnectionStateType.disconnected);
-      case 'failed':
-        return const ConnectionState(
-          type: ConnectionStateType.failed,
-          error: 'Connection failed',
-        );
-      case 'closed':
-        return const ConnectionState(type: ConnectionStateType.closed);
-      default:
-        return const ConnectionState(
-          type: ConnectionStateType.failed,
-          error: 'Unknown state',
-        );
-    }
-  }
-
-  factory ConnectionState.fromIceState(String state) {
-    switch (state) {
-      case 'checking':
-        return const ConnectionState(type: ConnectionStateType.connecting);
-      case 'connected':
-        return const ConnectionState(type: ConnectionStateType.connected);
-      case 'disconnected':
-        return const ConnectionState(type: ConnectionStateType.disconnected);
-      case 'failed':
-        return const ConnectionState(
-          type: ConnectionStateType.failed,
-          error: 'ICE connection failed',
-        );
-      case 'closed':
-        return const ConnectionState(type: ConnectionStateType.closed);
-      default:
-        return const ConnectionState(
-          type: ConnectionStateType.failed,
-          error: 'Unknown ICE state',
-        );
-    }
-  }
-
-  @override
-  String toString() => 'ConnectionState(type: $type, error: $error)';
-} 

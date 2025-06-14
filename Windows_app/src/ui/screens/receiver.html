@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MirrorCast - Receiver</title>
+    <link rel="stylesheet" href="../styles/theme.css">
+    <link rel="stylesheet" href="../styles/receiver.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">                <div class="header-brand">
+                    <button class="btn-back" id="backBtn" title="Back to Home">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <div class="header-logo">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                            <defs>
+                                <linearGradient id="receiverLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#2563EB"/>
+                                    <stop offset="100%" style="stop-color:#7C3AED"/>
+                                </linearGradient>
+                            </defs>
+                            <rect x="2" y="4" width="20" height="16" rx="2" ry="2" fill="url(#receiverLogoGradient)" stroke="white" stroke-width="0.5"/>
+                            <circle cx="12" cy="12" r="3" fill="white"/>
+                            <path d="M12 9v6M9 12h6" stroke="url(#receiverLogoGradient)" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h1 class="header-title">MirrorCast Receiver</h1>
+                </div>
+                <div class="header-center">
+                    <div class="connection-info" id="connectionInfo">
+                        <div class="room-badge" id="roomBadge">
+                            <span class="room-label">Room:</span>
+                            <span class="room-id" id="roomId">--</span>
+                        </div>
+                        <div class="connection-status" id="connectionStatus">
+                            <div class="status-indicator connecting"></div>
+                            <span class="status-text">Connecting...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-icon" id="fullscreenBtn" title="Toggle Fullscreen">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-icon" id="disconnectBtn" title="Disconnect">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            <path d="M3 12h18"></path>
+                        </svg>
+                    </button>
+                    <div class="window-controls">
+                        <button class="window-btn" id="minimizeBtn" title="Minimize">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 12h12"></path>
+                            </svg>
+                        </button>
+                        <button class="window-btn" id="maximizeBtn" title="Maximize">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                        </button>
+                        <button class="window-btn close-btn" id="closeBtn" title="Close">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="content-container">
+                <!-- Video Display Area -->
+                <section class="video-section">
+                    <div class="video-container" id="videoContainer">
+                        <video id="remoteVideo" autoplay playsinline class="remote-video"></video>
+                        
+                        <!-- Loading State -->
+                        <div class="loading-overlay" id="loadingOverlay">
+                            <div class="loading-content">
+                                <div class="loading-spinner"></div>
+                                <h3>Establishing Connection</h3>
+                                <p class="loading-message" id="loadingMessage">Connecting to room <span id="loadingRoomId">--</span>...</p>
+                                <div class="loading-steps">
+                                    <div class="step active" id="step1">
+                                        <div class="step-icon">1</div>
+                                        <span>Connecting to server</span>
+                                    </div>
+                                    <div class="step" id="step2">
+                                        <div class="step-icon">2</div>
+                                        <span>Joining room</span>
+                                    </div>
+                                    <div class="step" id="step3">
+                                        <div class="step-icon">3</div>
+                                        <span>Establishing peer connection</span>
+                                    </div>
+                                    <div class="step" id="step4">
+                                        <div class="step-icon">4</div>
+                                        <span>Receiving video stream</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No Stream State -->
+                        <div class="no-stream-overlay" id="noStreamOverlay" style="display: none;">
+                            <div class="no-stream-content">
+                                <div class="no-stream-icon">
+                                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                        <path d="M3 12h18"></path>
+                                    </svg>
+                                </div>
+                                <h3>Waiting for Screen Share</h3>
+                                <p>The sender hasn't started sharing their screen yet.</p>
+                                <p class="help-text">Make sure the sender has opened MirrorCast and started screen sharing.</p>
+                            </div>
+                        </div>
+
+                        <!-- Video Controls -->
+                        <div class="video-controls" id="videoControls">
+                            <div class="controls-left">
+                                <button class="control-btn" id="muteBtn" title="Toggle Audio">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                    </svg>
+                                </button>
+                                <div class="volume-slider">
+                                    <input type="range" id="volumeSlider" min="0" max="100" value="100" class="slider">
+                                </div>
+                            </div>
+                            <div class="controls-center">
+                                <div class="time-display" id="timeDisplay">00:00</div>
+                            </div>
+                            <div class="controls-right">
+                                <button class="control-btn" id="pictureInPictureBtn" title="Picture in Picture">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M19 7H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path>
+                                        <rect x="13" y="11" width="6" height="4" rx="1"></rect>
+                                    </svg>
+                                </button>
+                                <button class="control-btn" id="recordBtn" title="Record">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <circle cx="12" cy="12" r="6" fill="currentColor"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Stats and Info Panel -->
+                <aside class="info-panel">
+                    <div class="info-section">
+                        <h3>Connection Stats</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <label>Quality</label>
+                                <span class="stat-value" id="qualityValue">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>Resolution</label>
+                                <span class="stat-value" id="resolutionValue">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>FPS</label>
+                                <span class="stat-value" id="fpsValue">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>Bitrate</label>
+                                <span class="stat-value" id="bitrateValue">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>Latency</label>
+                                <span class="stat-value" id="latencyValue">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <label>Packets Lost</label>
+                                <span class="stat-value" id="packetsLostValue">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h3>Session Info</h3>
+                        <div class="session-info">
+                            <div class="info-item">
+                                <label>Server</label>
+                                <span class="info-value" id="serverValue">--</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Connected Time</label>
+                                <span class="info-value" id="connectedTimeValue">--</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Data Received</label>
+                                <span class="info-value" id="dataReceivedValue">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="info-section">
+                        <h3>Quick Actions</h3>
+                        <div class="quick-actions">
+                            <button class="action-btn" id="copyRoomBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy Room ID
+                            </button>
+                            <button class="action-btn" id="shareRoomBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                                    <polyline points="16,6 12,2 8,6"></polyline>
+                                    <line x1="12" y1="2" x2="12" y2="15"></line>
+                                </svg>
+                                Share Room
+                            </button>
+                            <button class="action-btn secondary" id="settingsBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M12 1v6m0 8v6m11-7h-6m-8 0H1"></path>
+                                </svg>
+                                Settings
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <span class="connection-time" id="connectionTime">Connected: --:--</span>
+                    <span class="separator">•</span>
+                    <span class="server-info" id="serverInfo">Server: --</span>
+                </div>
+                <div class="footer-actions">
+                    <button class="footer-btn" id="troubleshootBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <circle cx="12" cy="17" r="1"></circle>
+                            <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                        Troubleshoot
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal-overlay" id="errorModal" style="display: none;">
+        <div class="modal-content error-modal">
+            <div class="modal-header">
+                <h3>Connection Error</h3>
+                <button class="modal-close" id="closeErrorModalBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="error-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                </div>
+                <h4 id="errorTitle">Connection Failed</h4>
+                <p id="errorMessage">Unable to establish connection. Please check your network and try again.</p>
+                <div class="error-details" id="errorDetails" style="display: none;">
+                    <h5>Technical Details:</h5>
+                    <pre id="errorCode"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="showDetailsBtn">Show Details</button>
+                <button class="btn btn-primary" id="retryConnectionBtn">Retry Connection</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../scripts/receiver.js"></script>
+</body>
+</html>

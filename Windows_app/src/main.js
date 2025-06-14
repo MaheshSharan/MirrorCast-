@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -43,15 +43,42 @@ function createMainWindow() {
     height: 800,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      enableRemoteModule: true
     },
     show: false,
     frame: false, // Frameless window for modern look
     backgroundColor: '#F8FAFC'
   });
 
-  // Load the main app
-  mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
+  // Load the home screen instead of index.html
+  mainWindow.loadFile(path.join(__dirname, 'ui', 'home.html'));
+
+  // Expose window control functions to renderer using IPC
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow.webContents.executeJavaScript(`
+      const { ipcRenderer } = require('electron');
+      window.windowControls = {
+        minimize: () => ipcRenderer.send('window-minimize'),
+        maximize: () => ipcRenderer.send('window-maximize'),
+        close: () => ipcRenderer.send('window-close')
+      };
+    `);
+  });
+
+  // Also inject on page navigation
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.executeJavaScript(`
+      if (!window.windowControls) {
+        const { ipcRenderer } = require('electron');
+        window.windowControls = {
+          minimize: () => ipcRenderer.send('window-minimize'),
+          maximize: () => ipcRenderer.send('window-maximize'),
+          close: () => ipcRenderer.send('window-close')
+        };
+      }
+    `);
+  });
 
   // Show main window when ready and close splash
   mainWindow.once('ready-to-show', () => {
@@ -81,6 +108,29 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+// IPC handlers for window controls
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
 });
 
 app.on('activate', () => {

@@ -9,7 +9,11 @@
     "build": "electron-builder",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["mirrorcast", "screen-mirroring", "electron"],
+  "keywords": [
+    "mirrorcast",
+    "screen-mirroring",
+    "electron"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
@@ -17,11 +21,11 @@
     "electron-builder": "^24.9.1"
   },
   "dependencies": {
-    "qrcode": "^1.5.3",
+    "electron-store": "^8.1.0",
+    "qrcode": "^1.5.4",
     "webrtc-adapter": "^8.2.3",
-    "wrtc": "^0.4.7",
     "winston": "^3.11.0",
-    "electron-store": "^8.1.0"
+    "wrtc": "^0.4.7"
   },
   "build": {
     "appId": "com.mirrorcast.app",

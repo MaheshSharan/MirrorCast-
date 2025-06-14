@@ -6,18 +6,40 @@
     <title>MirrorCast</title>
     <link rel="stylesheet" href="styles/theme.css">
 </head>
-<body>    <div class="splash-screen">
-        <img src="../assets/images/logo.svg" alt="MirrorCast Logo" class="splash-logo">
-        <h1 class="splash-title">MirrorCast</h1>
-        <p class="splash-subtitle">Wireless Screen Mirroring</p>
-        <div class="loading-indicator"></div>
+<body>
+    <div class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo-container">
+                <img src="../assets/images/logo.svg" alt="MirrorCast Logo" class="splash-logo">
+                <div class="logo-glow"></div>
+            </div>
+            <h1 class="splash-title">MirrorCast</h1>
+            <p class="splash-subtitle">Wireless Screen Mirroring</p>
+            <div class="splash-loading">
+                <div class="loading-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <p class="loading-text">Starting up...</p>
+            </div>
+        </div>
+        <div class="splash-footer">
+            <p class="version-info">Version 1.0.0</p>
+            <p class="copyright">© 2025 MirrorCast. All rights reserved.</p>
+        </div>
     </div>
 
     <script>
-        // Add any initialization logic here
         window.addEventListener('DOMContentLoaded', () => {
-            // The transition to index.html is handled by main.js
-            // This ensures the splash screen stays visible for the full duration
+            // Add startup sequence
+            setTimeout(() => {
+                document.querySelector('.loading-text').textContent = 'Initializing...';
+            }, 1000);
+            
+            setTimeout(() => {
+                document.querySelector('.loading-text').textContent = 'Ready!';
+            }, 2500);
         });
     </script>
 </body>

@@ -52,29 +52,41 @@
 - [x] Clean architecture with separation of concerns
 - [x] Resource management and cleanup
 
-## Phase 3: Windows App Development
-- [ ] Core UI Implementation
-  - [ ] Home screen
-  - [ ] QR code display
-  - [ ] QR scanner
-  - [ ] Receiver screen
-  - [ ] Connection status
+## Phase 3: Windows App Development ✅
+- [x] Core UI Implementation ✅
+  - [x] Home screen ✅ (Generate QR + Settings only)
+  - [x] QR code display ✅ (Windows generates QR for Android to scan)
+  - [x] Receiver screen ✅ (Windows displays Android screen)
+  - [x] Connection status ✅
+  - [x] ~~QR scanner~~ ❌ (Removed - not needed for Windows)
 
-- [ ] WebRTC Integration
-  - [ ] Peer connection setup
-  - [ ] Signaling implementation
-  - [ ] Video rendering
-  - [ ] Connection management
+- [x] Architecture Correction ✅
+  - [x] Removed unnecessary QR scanner from Windows
+  - [x] Fixed user flow: Windows generates QR → Android scans → Android streams to Windows
+  - [x] Updated navigation: Home → QR Display → Receiver
+  - [x] Cleaned up dependencies and code
 
-- [ ] Screen Capture
-  - [ ] Windows screen capture
-  - [ ] Video encoding
-  - [ ] Performance optimization
+- [x] Receiver Screen Implementation ✅
+  - [x] WebRTC peer connection setup
+  - [x] Signaling server connection
+  - [x] Video stream rendering with controls
+  - [x] Connection state management
+  - [x] Real-time statistics display
+  - [x] Recording and picture-in-picture support
+  - [x] Fullscreen and volume controls
+  - [x] Error handling and reconnection
 
-- [ ] QR Code Integration
-  - [ ] QR code generation
-  - [ ] QR code scanning
-  - [ ] Connection handling
+- [ ] Backend Integration (Pending)
+  - [ ] Signaling server implementation
+  - [ ] WebRTC signaling coordination
+  - [ ] STUN/TURN server setup
+  - [ ] Connection quality optimization
+
+- [ ] Final Polish
+  - [ ] Settings and preferences
+  - [ ] About/help modals
+  - [ ] Keyboard shortcuts
+  - [ ] Window management improvements
 
 ## Phase 4: Testing and Optimization
 - [ ] Unit Testing
@@ -107,3 +119,26 @@
   - [ ] User guide
   - [ ] API documentation
   - [ ] Deployment guide
+
+## 🚨 **Android App Corrections Needed**
+The Android app currently has the wrong architecture and needs these fixes:
+
+### **Issues to Fix:**
+- ❌ **Remove QR Display** - Android shouldn't generate QR codes
+- ❌ **Remove Receiver Screen** - Android shouldn't receive video streams  
+- ❌ **Fix Home Screen** - Should only have "Scan QR" and "Settings" options
+- ✅ **Keep QR Scanner** - Android needs to scan Windows QR codes
+- ✅ **Keep Screen Capture** - Android needs to stream its screen to Windows
+
+### **Correct Android Flow Should Be:**
+```
+Android: Home → QR Scanner → Screen Capture/Sender → (Streams to Windows)
+Windows: Home → QR Display → Receiver → (Displays Android screen)
+```
+
+### **Android App Structure Should Be:**
+- `home_screen.dart` - Main menu with "Scan QR Code" button
+- `qr_scanner_screen.dart` - Scan Windows QR codes ✅
+- `screen_capture_screen.dart` - Capture and stream Android screen ✅
+- ~~`qr_display_screen.dart`~~ - ❌ Remove completely
+- ~~`receiver_screen.dart`~~ - ❌ Remove completely
